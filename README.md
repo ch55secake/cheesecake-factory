@@ -1,2 +1,73 @@
 # cheesecake-factory
-Reusable Github Actions for my repositories 
+
+Reusable GitHub workflows for my repositories.
+
+## Go Build and Test
+
+Call the workflow from a normal `pull_request` or `push` workflow:
+
+```yaml
+jobs:
+  go-build:
+    uses: ch55secake/cheesecake-factory/.github/workflows/go-build.yml@main
+    with:
+      build-command: make compile
+      test-command: make test
+```
+
+The default commands are `go build ./...` and `go test ./...`.
+
+## Go Lint
+
+```yaml
+jobs:
+  go-lint:
+    uses: ch55secake/cheesecake-factory/.github/workflows/go-lint.yml@main
+```
+
+The workflow reads the consuming repository's `go.mod` and golangci-lint configuration.
+The linter version and arguments can be overridden with `golangci-lint-version` and
+`args`.
+
+## UV Build and Test
+
+```yaml
+jobs:
+  python-ci:
+    uses: ch55secake/cheesecake-factory/.github/workflows/uv-build.yml@main
+    with:
+      python-version: '3.12'
+      smoke-command: uv run hypertension --help
+```
+
+The workflow runs a frozen UV install, Ruff formatting and lint checks, `uv build`,
+pytest, and the optional smoke command.
+
+## Pull Request Labeler
+
+The labeler is reusable, but the consuming repository owns its label rules. Call it
+from `pull_request_target` so it can write labels on pull requests from forks:
+
+```yaml
+name: Pull Request Labeler
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    uses: ch55secake/cheesecake-factory/.github/workflows/labeler.yml@main
+    with:
+      configuration-path: .github/labeler.yml
+```
+
+Keep the referenced configuration in the consuming repository at
+`.github/labeler.yml`, or pass a different `configuration-path`.
+
+For reproducible CI, replace `@main` with a release tag or commit SHA when consuming
+these workflows.

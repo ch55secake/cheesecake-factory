@@ -1,0 +1,62 @@
+name: Go Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      build-command:
+        description: Command used to build the project.
+        required: false
+        type: string
+        default: go build ./...
+      test-command:
+        description: Command used to run the project tests.
+        required: false
+        type: string
+        default: go test ./...
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-build-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build
+        run: ${{ inputs.build-command }}
+
+  test:
+    name: Test
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Test
+        run: ${{ inputs.test-command }}

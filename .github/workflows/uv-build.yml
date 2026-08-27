@@ -1,0 +1,55 @@
+name: UV Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version used by UV.
+        required: false
+        type: string
+        default: '3.12'
+      smoke-command:
+        description: Optional command used for a CLI smoke test.
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uv-build-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Check formatting with Ruff
+        run: uv run ruff format --check .
+
+      - name: Lint with Ruff
+        run: uv run ruff check .
+
+      - name: Build package
+        run: uv build
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Smoke test CLI
+        if: ${{ inputs.smoke-command != '' }}
+        run: ${{ inputs.smoke-command }}
