@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build
+    name: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,7 +42,7 @@ jobs:
         run: ${{ inputs.build-command }}
 
   test:
-    name: Test
+    name: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
