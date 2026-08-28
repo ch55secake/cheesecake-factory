@@ -59,6 +59,26 @@ Use `go-version-input` or `go-version-file` to select the Go version, and use
 `work-dir` and `cache-dependency-path` for Go modules outside the repository root. The
 default text output fails the job when a vulnerability is found.
 
+## SonarQube
+
+The reusable workflow supports both SonarQube Cloud and SonarQube Server. The
+consuming repository must contain a `sonar-project.properties` file and configure a
+`SONAR_TOKEN` secret.
+
+```yaml
+jobs:
+  sonarqube:
+    uses: ch55secake/cheesecake-factory/.github/workflows/sonarqube.yml@main
+    with:
+      sonar-host-url: ${{ vars.SONAR_HOST_URL }}
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ROOT_CERT: ${{ secrets.SONAR_ROOT_CERT }}
+```
+
+`sonar-host-url` is only needed for SonarQube Server. `project-base-dir` and scanner
+`args` can be supplied for projects that do not use the repository root defaults.
+
 ## Pull Request Labeler
 
 The labeler is reusable, but the consuming repository owns its label rules. Call it

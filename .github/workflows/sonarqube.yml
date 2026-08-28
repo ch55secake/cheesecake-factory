@@ -1,0 +1,54 @@
+name: SonarQube
+
+on:
+  workflow_call:
+    inputs:
+      project-base-dir:
+        description: Directory containing the SonarQube project configuration.
+        required: false
+        type: string
+        default: .
+      sonar-host-url:
+        description: SonarQube Server URL. Leave empty when using SonarQube Cloud.
+        required: false
+        type: string
+        default: ''
+      args:
+        description: Optional arguments passed to the SonarQube scanner.
+        required: false
+        type: string
+        default: ''
+    secrets:
+      SONAR_TOKEN:
+        description: Token used to authenticate with SonarQube.
+        required: true
+      SONAR_ROOT_CERT:
+        description: Optional PEM certificate for a secured SonarQube connection.
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonarqube-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v8.2.1
+        with:
+          projectBaseDir: ${{ inputs.project-base-dir }}
+          args: ${{ inputs.args }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
+          SONAR_ROOT_CERT: ${{ secrets.SONAR_ROOT_CERT }}
