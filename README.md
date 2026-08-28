@@ -41,6 +41,24 @@ The workflow runs independent format, lint, build, and test jobs. Each job perfo
 frozen UV install with dependency caching. The test job runs pytest and the optional
 smoke command.
 
+## Go Vulnerability Check
+
+The reusable workflow runs Go's official `govulncheck` tool against the consuming
+repository. It uses the Go version from `go.mod` and enables dependency and build
+caching by default.
+
+```yaml
+jobs:
+  go-vuln:
+    uses: ch55secake/cheesecake-factory/.github/workflows/go-vuln.yml@main
+    with:
+      go-package: ./...
+```
+
+Use `go-version-input` or `go-version-file` to select the Go version, and use
+`work-dir` and `cache-dependency-path` for Go modules outside the repository root. The
+default text output fails the job when a vulnerability is found.
+
 ## Pull Request Labeler
 
 The labeler is reusable, but the consuming repository owns its label rules. Call it
