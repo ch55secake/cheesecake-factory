@@ -1,0 +1,75 @@
+name: Go Vulnerability Check
+
+on:
+  workflow_call:
+    inputs:
+      go-version-input:
+        description: Go version used for the vulnerability scan.
+        required: false
+        type: string
+        default: ''
+      go-version-file:
+        description: Go version file used when go-version-input is empty.
+        required: false
+        type: string
+        default: go.mod
+      go-package:
+        description: Package pattern to scan.
+        required: false
+        type: string
+        default: ./...
+      work-dir:
+        description: Directory in which to run govulncheck.
+        required: false
+        type: string
+        default: .
+      cache:
+        description: Enable Go dependency and build caching.
+        required: false
+        type: boolean
+        default: true
+      cache-dependency-path:
+        description: Dependency file path used to construct the cache key.
+        required: false
+        type: string
+        default: ''
+      check-latest:
+        description: Check for the latest available Go version.
+        required: false
+        type: boolean
+        default: false
+      output-format:
+        description: govulncheck output format.
+        required: false
+        type: string
+        default: text
+      output-file:
+        description: Optional file to which govulncheck output is written.
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-vuln-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Scan dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ inputs.go-version-input }}
+          go-version-file: ${{ inputs.go-version-file }}
+          go-package: ${{ inputs.go-package }}
+          work-dir: ${{ inputs.work-dir }}
+          cache: ${{ inputs.cache }}
+          cache-dependency-path: ${{ inputs.cache-dependency-path }}
+          check-latest: ${{ inputs.check-latest }}
+          output-format: ${{ inputs.output-format }}
+          output-file: ${{ inputs.output-file }}
