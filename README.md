@@ -13,17 +13,14 @@ jobs:
     with:
       build-command: make compile
       test-command: make test
-```
-
-The default commands are `go build ./...` and `go test ./...`.
-
-## Go Lint
-
-```yaml
-jobs:
   go-lint:
     uses: ch55secake/cheesecake-factory/.github/workflows/go-lint.yml@main
 ```
+
+The build, test, and lint jobs run independently. Each Go job caches modules and build
+artifacts. The default commands are `go build ./...` and `go test ./...`.
+
+## Go Lint
 
 The workflow reads the consuming repository's `go.mod` and golangci-lint configuration.
 The linter version and arguments can be overridden with `golangci-lint-version` and
@@ -40,8 +37,9 @@ jobs:
       smoke-command: uv run hypertension --help
 ```
 
-The workflow runs a frozen UV install, Ruff formatting and lint checks, `uv build`,
-pytest, and the optional smoke command.
+The workflow runs independent format, lint, build, and test jobs. Each job performs a
+frozen UV install with dependency caching. The test job runs pytest and the optional
+smoke command.
 
 ## Pull Request Labeler
 
