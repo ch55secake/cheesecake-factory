@@ -18,7 +18,8 @@ jobs:
 ```
 
 The build, test, and lint jobs run independently. Each Go job caches modules and build
-artifacts. The default commands are `go build ./...` and `go test ./...`.
+artifacts. The default commands are `go build ./...` and `go test ./...`; the test job
+also runs `go test -cover ./...`.
 
 ## Go Lint
 

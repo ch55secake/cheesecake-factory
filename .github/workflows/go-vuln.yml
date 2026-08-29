@@ -58,7 +58,7 @@ concurrency:
 
 jobs:
   scan:
-    name: Scan dependencies
+    name: scan-dependencies
     runs-on: ubuntu-latest
     steps:
       - name: Run govulncheck
