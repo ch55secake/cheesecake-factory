@@ -24,9 +24,10 @@ on:
         type: string
         default: '[{"goos":"linux","goarch":"amd64"},{"goos":"darwin","goarch":"amd64"}]'
       version:
-        description: Semantic version for the release, without the v prefix.
-        required: true
+        description: Optional semantic version override, without the v prefix.
+        required: false
         type: string
+        default: ''
       generate-notes:
         description: Generate release notes from the commits included in the release.
         required: false
@@ -85,16 +86,62 @@ jobs:
         with:
           path: dist
 
-      - name: Generate release tag
+      - name: Resolve release tag
         id: release_tag
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
           VERSION: ${{ inputs.version }}
         run: |
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Version must use major.minor.patch format, got: $VERSION" >&2
-            exit 1
+          latest_major=0
+          latest_minor=0
+          latest_patch=0
+          found_release=false
+
+          while IFS= read -r tag; do
+            if [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+              major=${BASH_REMATCH[1]}
+              minor=${BASH_REMATCH[2]}
+              patch=${BASH_REMATCH[3]}
+
+              if [[ "$found_release" == false ]] ||
+                (( major > latest_major )) ||
+                (( major == latest_major && minor > latest_minor )) ||
+                (( major == latest_major && minor == latest_minor && patch > latest_patch )); then
+                latest_major=$major
+                latest_minor=$minor
+                latest_patch=$patch
+                found_release=true
+              fi
+            fi
+          done < <(gh api --paginate "repos/$REPOSITORY/releases?per_page=100" --jq '.[] | select(.draft == false) | .tag_name')
+
+          if [[ -n "$VERSION" ]]; then
+            if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+              echo "Version must use major.minor.patch format, got: $VERSION" >&2
+              exit 1
+            fi
+
+            major=${BASH_REMATCH[1]}
+            minor=${BASH_REMATCH[2]}
+            patch=${BASH_REMATCH[3]}
+            if [[ "$found_release" == true ]] &&
+              ! (( major > latest_major ||
+                (major == latest_major && minor > latest_minor) ||
+                (major == latest_major && minor == latest_minor && patch > latest_patch) )); then
+              echo "Version $VERSION must be greater than the latest release v$latest_major.$latest_minor.$latest_patch" >&2
+              exit 1
+            fi
+          elif [[ "$found_release" == true ]]; then
+            major=$latest_major
+            minor=$latest_minor
+            patch=$((latest_patch + 1))
+            VERSION="$major.$minor.$patch"
+          else
+            VERSION=1.0.0
           fi
 
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
