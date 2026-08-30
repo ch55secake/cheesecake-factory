@@ -106,5 +106,36 @@ jobs:
 Keep the referenced configuration in the consuming repository at
 `.github/labeler.yml`, or pass a different `configuration-path`.
 
+## Release
+
+The reusable release workflow cross-compiles a Go executable, uploads the binaries as
+artifacts, and creates a GitHub release. The consuming workflow owns the release trigger
+and must grant `contents: write` permission:
+
+```yaml
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: ch55secake/cheesecake-factory/.github/workflows/release.yml@main
+    with:
+      binary-name: convoy
+      build-package: ./cmd/convoy
+```
+
+The default targets are Linux and macOS on amd64. Pass `targets` as a JSON array to
+change them, for example `[{"goos":"linux","goarch":"arm64"}]`. The first release
+is tagged `v1.0.0`, and each later release increments the patch version from the highest
+published semantic release. Set the optional `version` input to a higher
+`major.minor.patch` value for a deliberate major or minor version bump, such as `2.0.0`.
+`generate-notes` controls GitHub's generated release notes.
+
 For reproducible CI, replace `@main` with a release tag or commit SHA when consuming
 these workflows.
