@@ -1,4 +1,4 @@
-name: Release
+name: go-release
 
 on:
   workflow_call:
