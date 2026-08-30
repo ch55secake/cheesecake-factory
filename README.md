@@ -128,12 +128,13 @@ jobs:
     with:
       binary-name: convoy
       build-package: ./cmd/convoy
+      version: 1.0.1
 ```
 
 The default targets are Linux and macOS on amd64. Pass `targets` as a JSON array to
-change them, for example `[{"goos":"linux","goarch":"arm64"}]`. Use `release-tag`
-to provide an explicit tag; otherwise the workflow generates a tag from the UTC date
-and commit SHA. `generate-notes` controls GitHub's generated release notes.
+change them, for example `[{"goos":"linux","goarch":"arm64"}]`. The required
+`version` input must use `major.minor.patch` format and produces a `v<version>` tag.
+`generate-notes` controls GitHub's generated release notes.
 
 For reproducible CI, replace `@main` with a release tag or commit SHA when consuming
 these workflows.
