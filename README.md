@@ -128,6 +128,7 @@ jobs:
     with:
       binary-name: convoy
       build-package: ./cmd/convoy
+      ldflags: "-s -w"
 ```
 
 The default targets are Linux and macOS on amd64. Pass `targets` as a JSON array to
@@ -135,7 +136,8 @@ change them, for example `[{"goos":"linux","goarch":"arm64"}]`. The first releas
 is tagged `v1.0.0`, and each later release increments the patch version from the highest
 published semantic release. Set the optional `version` input to a higher
 `major.minor.patch` value for a deliberate major or minor version bump, such as `2.0.0`.
-`generate-notes` controls GitHub's generated release notes.
+Use `ldflags` to pass linker flags to each build, such as `-s -w` or
+`-X main.version=1.0.0`. `generate-notes` controls GitHub's generated release notes.
 
 For reproducible CI, replace `@main` with a release tag or commit SHA when consuming
 these workflows.
