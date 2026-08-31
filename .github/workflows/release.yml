@@ -161,6 +161,7 @@ jobs:
           BINARY_NAME: ${{ inputs.binary-name }}
           GENERATE_NOTES: ${{ inputs.generate-notes }}
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
         run: |
           shopt -s nullglob
@@ -175,4 +176,4 @@ jobs:
             release_options+=(--generate-notes)
           fi
 
-          gh release create "$RELEASE_TAG" "${assets[@]}" "${release_options[@]}"
+          gh release create "$RELEASE_TAG" "${assets[@]}" "${release_options[@]}" --repo "$REPOSITORY"
