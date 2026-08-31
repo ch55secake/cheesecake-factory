@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: .
+      ldflags:
+        description: Optional flags passed to the Go linker.
+        required: false
+        type: string
+        default: ''
       go-version-file:
         description: File used by setup-go to determine the Go version.
         required: false
@@ -62,11 +67,18 @@ jobs:
 
       - name: Build binary
         env:
+          BINARY_NAME: ${{ inputs.binary-name }}
+          BUILD_PACKAGE: ${{ inputs.build-package }}
           GOOS: ${{ matrix.target.goos }}
           GOARCH: ${{ matrix.target.goarch }}
+          LDFLAGS: ${{ inputs.ldflags }}
         run: |
           mkdir -p dist
-          go build -o "dist/${{ inputs.binary-name }}-${{ matrix.target.goos }}-${{ matrix.target.goarch }}" "${{ inputs.build-package }}"
+          build_args=(-o "dist/$BINARY_NAME-$GOOS-$GOARCH")
+          if [[ -n "$LDFLAGS" ]]; then
+            build_args+=(-ldflags "$LDFLAGS")
+          fi
+          go build "${build_args[@]}" "$BUILD_PACKAGE"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
