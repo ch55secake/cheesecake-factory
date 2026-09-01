@@ -138,6 +138,9 @@ published semantic release. Set the optional `version` input to a higher
 `major.minor.patch` value for a deliberate major or minor version bump, such as `2.0.0`.
 Use `ldflags` to pass linker flags to each build, such as `-s -w` or
 `-X main.version=1.0.0`. `generate-notes` controls GitHub's generated release notes.
+Use `cgo-enabled: '0'` for portable binaries that do not require cgo, especially when
+cross-compiling to multiple operating systems and architectures. It defaults to `'1'` for
+backwards compatibility.
 
 For reproducible CI, replace `@main` with a release tag or commit SHA when consuming
 these workflows.
