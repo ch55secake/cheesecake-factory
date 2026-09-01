@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: .
+      cgo-enabled:
+        description: Value for CGO_ENABLED during cross-compilation.
+        required: false
+        type: string
+        default: '1'
       ldflags:
         description: Optional flags passed to the Go linker.
         required: false
@@ -69,6 +74,7 @@ jobs:
         env:
           BINARY_NAME: ${{ inputs.binary-name }}
           BUILD_PACKAGE: ${{ inputs.build-package }}
+          CGO_ENABLED: ${{ inputs.cgo-enabled }}
           GOOS: ${{ matrix.target.goos }}
           GOARCH: ${{ matrix.target.goarch }}
           LDFLAGS: ${{ inputs.ldflags }}
