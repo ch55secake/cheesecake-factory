@@ -108,9 +108,10 @@ Keep the referenced configuration in the consuming repository at
 
 ## Release
 
-The reusable release workflow cross-compiles a Go executable, uploads the binaries as
-artifacts, and creates a GitHub release. The consuming workflow owns the release trigger
-and must grant `contents: write` permission:
+The reusable release workflow uses GoReleaser to cross-compile a Go executable, package
+the binaries into archives, create checksums, generate release notes, and publish a
+GitHub release. The consuming workflow owns the release trigger and must grant
+`contents: write` permission:
 
 ```yaml
 name: Release
@@ -137,7 +138,9 @@ is tagged `v1.0.0`, and each later release increments the patch version from the
 published semantic release. Set the optional `version` input to a higher
 `major.minor.patch` value for a deliberate major or minor version bump, such as `2.0.0`.
 Use `ldflags` to pass linker flags to each build, such as `-s -w` or
-`-X main.version=1.0.0`. `generate-notes` controls GitHub's generated release notes.
+`-X main.version=1.0.0`. `cgo-enabled` controls `CGO_ENABLED`, and
+`goreleaser-version` selects the GoReleaser version. `generate-notes` controls whether
+GoReleaser generates the release changelog.
 Use `cgo-enabled: '0'` for portable binaries that do not require cgo, especially when
 cross-compiling to multiple operating systems and architectures. It defaults to `'1'` for
 backwards compatibility.

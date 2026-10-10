@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       binary-name:
-        description: Name used for built binaries, artifacts, and release assets.
+        description: Name used for the binary and release archives.
         required: false
         type: string
         default: app
@@ -14,7 +14,7 @@ on:
         type: string
         default: .
       cgo-enabled:
-        description: Value for CGO_ENABLED during cross-compilation.
+        description: Value for CGO_ENABLED during release builds.
         required: false
         type: string
         default: '1'
@@ -38,6 +38,11 @@ on:
         required: false
         type: string
         default: ''
+      goreleaser-version:
+        description: GoReleaser version installed by the release action.
+        required: false
+        type: string
+        default: '~> v2'
       generate-notes:
         description: Generate release notes from the commits included in the release.
         required: false
@@ -49,17 +54,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: build-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
+  release:
+    name: release
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-    strategy:
-      matrix:
-        target: ${{ fromJSON(inputs.targets) }}
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -69,40 +73,6 @@ jobs:
 
       - name: Download dependencies
         run: go mod download
-
-      - name: Build binary
-        env:
-          BINARY_NAME: ${{ inputs.binary-name }}
-          BUILD_PACKAGE: ${{ inputs.build-package }}
-          CGO_ENABLED: ${{ inputs.cgo-enabled }}
-          GOOS: ${{ matrix.target.goos }}
-          GOARCH: ${{ matrix.target.goarch }}
-          LDFLAGS: ${{ inputs.ldflags }}
-        run: |
-          mkdir -p dist
-          build_args=(-o "dist/$BINARY_NAME-$GOOS-$GOARCH")
-          if [[ -n "$LDFLAGS" ]]; then
-            build_args+=(-ldflags "$LDFLAGS")
-          fi
-          go build "${build_args[@]}" "$BUILD_PACKAGE"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.binary-name }}-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
-          path: dist/${{ inputs.binary-name }}-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
-
-  release:
-    name: release
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: write
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
 
       - name: Resolve release tag
         id: release_tag
@@ -159,27 +129,103 @@ jobs:
             VERSION=1.0.0
           fi
 
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          RELEASE_TAG="v$VERSION"
+          if git show-ref --tags --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            echo "Tag $RELEASE_TAG already exists" >&2
+            exit 1
+          fi
+          git -c tag.gpgSign=false -c tag.forceSignAnnotated=false tag "$RELEASE_TAG" "$GITHUB_SHA"
 
-      - name: Create GitHub release
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate GoReleaser configuration
         env:
           BINARY_NAME: ${{ inputs.binary-name }}
+          BUILD_PACKAGE: ${{ inputs.build-package }}
+          CGO_ENABLED: ${{ inputs.cgo-enabled }}
           GENERATE_NOTES: ${{ inputs.generate-notes }}
-          GH_TOKEN: ${{ github.token }}
+          LDFLAGS: ${{ inputs.ldflags }}
           REPOSITORY: ${{ github.repository }}
-          RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
+          TARGETS: ${{ inputs.targets }}
+          CONFIG_PATH: ${{ runner.temp }}/goreleaser.generated.yaml
         run: |
-          shopt -s nullglob
-          assets=(dist/"$BINARY_NAME"-*/"$BINARY_NAME"-*)
-          if (( ${#assets[@]} == 0 )); then
-            echo "No release assets found for $BINARY_NAME" >&2
+          set -euo pipefail
+
+          config="$CONFIG_PATH"
+          yaml_quote() {
+            jq -Rn --arg value "$1" '$value'
+          }
+
+          if ! jq -e 'type == "array" and length > 0' <<< "$TARGETS" >/dev/null; then
+            echo 'targets must be a non-empty JSON array' >&2
             exit 1
           fi
 
-          release_options=(--title "$RELEASE_TAG" --target "$GITHUB_SHA")
-          if [[ "$GENERATE_NOTES" == 'true' ]]; then
-            release_options+=(--generate-notes)
+          owner=${REPOSITORY%%/*}
+          repository_name=${REPOSITORY#*/}
+          printf 'version: 2\n' > "$config"
+          printf 'project_name: %s\n' "$(yaml_quote "$BINARY_NAME")" >> "$config"
+          printf 'builds:\n' >> "$config"
+
+          declare -A seen_targets=()
+          target_count=$(jq 'length' <<< "$TARGETS")
+          for ((index = 0; index < target_count; index++)); do
+            target=$(jq -c ".[$index]" <<< "$TARGETS")
+            goos=$(jq -r '.goos // empty' <<< "$target")
+            goarch=$(jq -r '.goarch // empty' <<< "$target")
+            target_key="$goos/$goarch"
+
+            if [[ ! "$goos" =~ ^[a-z0-9_]+$ ]] || [[ ! "$goarch" =~ ^[a-z0-9_]+$ ]]; then
+              echo "Invalid target: $target" >&2
+              exit 1
+            fi
+            if [[ -n "${seen_targets[$target_key]:-}" ]]; then
+              echo "Duplicate target: $target_key" >&2
+              exit 1
+            fi
+            seen_targets[$target_key]=1
+
+            printf '  - id: %s\n' "build-$goos-$goarch" >> "$config"
+            printf '    main: %s\n' "$(yaml_quote "$BUILD_PACKAGE")" >> "$config"
+            printf '    binary: %s\n' "$(yaml_quote "$BINARY_NAME")" >> "$config"
+            printf '    goos:\n      - %s\n' "$(yaml_quote "$goos")" >> "$config"
+            printf '    goarch:\n      - %s\n' "$(yaml_quote "$goarch")" >> "$config"
+            printf '    env:\n      - %s\n' "$(yaml_quote "CGO_ENABLED=$CGO_ENABLED")" >> "$config"
+            if [[ -n "$LDFLAGS" ]]; then
+              printf '    ldflags:\n      - %s\n' "$(yaml_quote "$LDFLAGS")" >> "$config"
+            fi
+          done
+
+          cat >> "$config" <<EOF
+          archives:
+            - formats:
+                - tar.gz
+              name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+          checksum:
+            name_template: checksums.txt
+          release:
+            github:
+              owner: $(yaml_quote "$owner")
+              name: $(yaml_quote "$repository_name")
+            target_commitish: '{{ .Commit }}'
+            name_template: 'v{{ .Version }}'
+          EOF
+
+          if [[ "$GENERATE_NOTES" != true ]]; then
+            cat >> "$config" <<'EOF'
+          changelog:
+            disable: true
+          EOF
           fi
 
-          gh release create "$RELEASE_TAG" "${assets[@]}" "${release_options[@]}" --repo "$REPOSITORY"
+          cat "$config"
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: ${{ inputs.goreleaser-version }}
+          args: release --clean --config ${{ runner.temp }}/goreleaser.generated.yaml
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
