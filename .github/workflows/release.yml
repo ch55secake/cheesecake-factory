@@ -164,11 +164,9 @@ jobs:
 
           owner=${REPOSITORY%%/*}
           repository_name=${REPOSITORY#*/}
-          printf 'version: 2\n' > "$config"
-          printf 'project_name: %s\n' "$(yaml_quote "$BINARY_NAME")" >> "$config"
-          printf 'builds:\n' >> "$config"
-
           declare -A seen_targets=()
+          target_gooses=()
+          target_goarches=()
           target_count=$(jq 'length' <<< "$TARGETS")
           for ((index = 0; index < target_count; index++)); do
             target=$(jq -c ".[$index]" <<< "$TARGETS")
@@ -185,19 +183,29 @@ jobs:
               exit 1
             fi
             seen_targets[$target_key]=1
-
-            printf '  - id: %s\n' "build-$goos-$goarch" >> "$config"
-            printf '    main: %s\n' "$(yaml_quote "$BUILD_PACKAGE")" >> "$config"
-            printf '    binary: %s\n' "$(yaml_quote "$BINARY_NAME")" >> "$config"
-            printf '    goos:\n      - %s\n' "$(yaml_quote "$goos")" >> "$config"
-            printf '    goarch:\n      - %s\n' "$(yaml_quote "$goarch")" >> "$config"
-            printf '    env:\n      - %s\n' "$(yaml_quote "CGO_ENABLED=$CGO_ENABLED")" >> "$config"
-            if [[ -n "$LDFLAGS" ]]; then
-              printf '    ldflags:\n      - %s\n' "$(yaml_quote "$LDFLAGS")" >> "$config"
-            fi
+            target_gooses+=("$goos")
+            target_goarches+=("$goarch")
           done
 
-          cat >> "$config" <<EOF
+          {
+            printf 'version: 2\n'
+            printf 'project_name: %s\n' "$(yaml_quote "$BINARY_NAME")"
+            printf 'builds:\n'
+            for ((index = 0; index < target_count; index++)); do
+              goos=${target_gooses[$index]}
+              goarch=${target_goarches[$index]}
+              printf '  - id: %s\n' "build-$goos-$goarch"
+              printf '    main: %s\n' "$(yaml_quote "$BUILD_PACKAGE")"
+              printf '    binary: %s\n' "$(yaml_quote "$BINARY_NAME")"
+              printf '    goos:\n      - %s\n' "$(yaml_quote "$goos")"
+              printf '    goarch:\n      - %s\n' "$(yaml_quote "$goarch")"
+              printf '    env:\n      - %s\n' "$(yaml_quote "CGO_ENABLED=$CGO_ENABLED")"
+              if [[ -n "$LDFLAGS" ]]; then
+                printf '    ldflags:\n      - %s\n' "$(yaml_quote "$LDFLAGS")"
+              fi
+            done
+
+            cat <<EOF
           archives:
             - formats:
                 - tar.gz
@@ -212,12 +220,13 @@ jobs:
             name_template: 'v{{ .Version }}'
           EOF
 
-          if [[ "$GENERATE_NOTES" != true ]]; then
-            cat >> "$config" <<'EOF'
+            if [[ "$GENERATE_NOTES" != true ]]; then
+              cat <<'EOF'
           changelog:
             disable: true
           EOF
-          fi
+            fi
+          } > "$config"
 
           cat "$config"
 
